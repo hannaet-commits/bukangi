@@ -1,5 +1,12 @@
 # 부캉이 (Bukangi) 🦈
 
+## ⬇️ 바로 받아서 쓰기 (Windows)
+
+**[Bukangi.exe 내려받기](https://github.com/hannaet-commits/bukangi/releases/latest/download/Bukangi.exe)** — 더블클릭하면 바로 실행됩니다 (파이썬 설치 필요 없음).
+종료는 상어 우클릭 메뉴 또는 트레이 아이콘에서 합니다.
+
+> 처음 실행할 때 "Windows의 PC 보호" 파란 창이 뜨면 **추가 정보 → 실행** 을 누르세요. (개인이 만든 프로그램이라 서명이 없어서 나오는 안내입니다)
+
 Windows 바탕화면을 자유롭게 헤엄치는 흑상어 데스크톱 펫. Python 3.11+ / PySide6.
 
 ## 빠른 시작 (가상환경)
