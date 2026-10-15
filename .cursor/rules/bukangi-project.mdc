@@ -1,0 +1,63 @@
+---
+description: 부캉이 데스크톱 펫 프로젝트 전반 규칙 (구조, 가상환경, 코딩 스타일)
+alwaysApply: true
+---
+
+# 부캉이 (Bukangi) 데스크톱 펫
+
+Windows 바탕화면을 헤엄치는 흑상어 캐릭터 "부캉이". Python 3.11+ / PySide6 기반.
+
+## 실행 환경 (가상환경 필수)
+
+- 모든 Python 실행/설치는 프로젝트 루트의 `.venv` 안에서 한다. 전역 Python에 `pip install` 하지 않는다.
+- 최초 설정: `setup_venv.bat` (또는 `python -m venv .venv` → `.venv\Scripts\pip install -r requirements.txt`)
+- 실행: `run.bat` 또는 `.venv\Scripts\python.exe main.py`
+- 터미널은 PowerShell. 명령 연결에 `&&` 대신 `;` 를 쓴다.
+- 의존성을 추가하면 `requirements.txt`(실행용) / `requirements-dev.txt`(빌드·개발용)에 반드시 반영한다.
+
+## 파일 역할
+
+- `main.py` : 진입점. 앱 생성, 인자 처리(`--test`, `--turn` 등), 단일 실행 보장, 트레이 아이콘.
+- `settings.py` : 모든 상수(크기/속도/타이머/문구/재생 순서/프레임 위치 보정), 에셋 경로(`resource_path`), 사용자 설정 저장.
+- `asset_check.py` : PNG 에셋 검사(존재/PNG 여부/알파/크기/손상). CLI로도 실행 가능.
+- `animation.py` : 스프라이트 로딩, 프레임별 위치 보정 + 공통 영역 크롭, 크기별 렌더 캐시(`RenderSet`),
+  꼬리 타임라인(`SwimTimeline`), 프레임 재생(`AnimationPlayer`: 상태를 읽어 `FrameSpec` 을 결정).
+- `placeholder.py` : 에셋이 없을 때 코드로 그리는 임시 상어(헤엄 + 방향 전환).
+- `behavior.py` : 이동/상태 로직. `PetState`(swimming_right/left, turning_right_to_left/left_to_right). Qt 위젯에 의존하지 않는 순수 로직.
+- `pet_window.py` : 투명 창, 드래그, 우클릭 메뉴, 타이머 루프, 테스트 메뉴(강제 turn).
+- `speech_bubble.py` : 말풍선 창.
+- `tests/` : 단위 테스트(`test_core.py`), 실제 화면 스모크 테스트(`smoke_run.py`), CPU 측정(`bench_cpu.py`).
+- `tools/` : 개발용 도구 — `analyze_frames.py`(프레임 분석/컨택트 시트), `preview_swim.py`(재생 미리보기/GIF 저장). 앱 실행에는 불필요.
+
+## 애니메이션 구조 (바꿀 때 지켜야 할 것)
+
+- 방향(그림 좌우 반전)은 **상태(PetState)로만** 정해진다. 속도 부호로 정하지 않는다 → 방향이 바뀌는 순간 한 프레임 뒤집힘 방지.
+- 방향 전환(turn)은 시작하면 끝까지 재생한다. 끊을 수 있는 것은 드래그뿐이다. turn 중에는 일반 헤엄 프레임을 섞지 않는다.
+- 방향 전환 방식은 `settings.TURN_STYLE`: 기본 `"art"` = turn PNG 8장 재생, `"flip"` = 헤엄 그림을 가로로 눌렀다가(`FrameSpec.squash`) 가장 납작할 때 좌우 반전을 바꿔 펴기(위 "일반 헤엄 프레임을 섞지 않는다"는 `"art"` 전용).
+- 왼쪽 그림은 오른쪽 그림을 좌우 반전해서 쓴다 (`turn_right_to_left` 를 반전하면 왼쪽→오른쪽 turn). 반전본도 미리 만들어 캐시한다.
+- 기본(`SWIM_PROCEDURAL=True`): swim PNG 한 장(`SWIM_BASE_FRAME`)을 기준으로 `animation.make_tail_wave_frames` 가 꼬리를 좌우(`TAIL_SWAY_OUT/IN`, 바깥으로 펴지는 여백은 `_load` 에서 모든 그림 왼쪽에 `_pad_left` 로 미리 붙인다)로 흔든 프레임을 만들어 재생한다(위아래 `TAIL_WAVE_AMPLITUDE` 기본 0, 헤엄 중 `BOB_AMPLITUDE_SWIM` 도 0). 프레임마다 몸/명암이 다른 PNG 를 섞으면 깜빡이므로 몸통·머리는 고정한다.
+- `SWIM_PROCEDURAL=False` 일 때 꼬리 재생 순서는 파일 번호 순서가 아니라 `settings.SWIM_SMOOTH_PATH` 배열로 정한다(파일 이름은 바꾸지 않는다).
+- 꼬리 주기(`SpeedPreset.tail_period`)는 실제 경과 시간 기준이며 화면 이동 속도와 독립이다.
+- 프레임 위치 보정(`SWIM_FRAME_OFFSETS`, `TURN_FRAME_OFFSETS`)은 메모리상의 복사본에만 적용한다. PNG 는 수정하지 않는다.
+- 두 프레임을 섞을 때 Qt 의 `CompositionMode_Plus` 는 `setOpacity` 와 함께 쓰면 선형이 아니다(몸통이 반투명해짐). `pet_window.paintEvent` 의 방식(B 를 임시 버퍼에 미리 투명도 곱함)을 유지한다.
+
+## 코딩 규칙
+
+- 주석과 docstring은 한국어로, 초보자가 이해할 수 있게 "왜" 위주로 쓴다.
+- 구조는 단순하게 유지한다. 불필요한 추상화/프레임워크를 도입하지 않는다.
+- 매직 넘버는 `settings.py`로 모은다.
+- 에셋 경로는 현재 작업 폴더(cwd)에 의존하지 말고 반드시 `settings.resource_path()` / `settings.ASSETS_DIR` 를 쓴다. (PyInstaller 대응)
+- 에셋/이미지 파일 로딩, 외부 입력은 방어적으로 처리한다(예외 → 로그 + 대체 동작). 에셋이 전부 없어도 placeholder로 실행되어야 한다. turn 만 없으면 헤엄만 한다.
+- 타이머 루프는 가볍게 유지한다. 그림이 바뀔 때만 다시 그리고, 위치가 바뀔 때만 `move()` 한다. 창 모양(`setMask`)은 상태가 바뀔 때만 바꾼다.
+- 고해상도(HiDPI)를 고려해 픽스맵은 `devicePixelRatio`에 맞춰 미리 스케일해 캐시한다.
+
+## 에셋 보호
+
+- `assets/` 아래 사용자가 만든 PNG는 절대 덮어쓰거나 삭제하지 않는다. 변환/분석/GIF 결과는 별도 임시 폴더(`.tmp/`)에만 저장한다.
+- 에셋 구조: `assets/swim_right/frame_01~10.png`, `assets/turn_right_to_left/turn_01~08.png` (오른쪽을 보는 이미지, 왼쪽은 코드에서 좌우 반전).
+- 예전 `assets/idle`, `assets/blink`, `assets/swim_rigth_old` 는 지금 쓰지 않지만 지우지 않는다 (`settings.USE_LEGACY_IDLE_ASSETS`).
+
+## 검증
+
+- 변경 후에는 `.venv\Scripts\python.exe -m unittest discover tests` 로 테스트하고, 화면이 바뀌는 변경은 `tests\smoke_run.py` 도 돌린다.
+- 실제로 실행해 보지 못한 항목을 "검증 완료"라고 쓰지 않는다.

@@ -1,0 +1,5 @@
+-r requirements.txt
+pyinstaller>=6.0
+# tools/analyze_frames.py, tools/preview_swim.py (프레임 분석/GIF 저장) 에만 필요. 앱 실행에는 필요 없음
+pillow>=10.0
+numpy>=1.26
